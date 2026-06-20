@@ -218,7 +218,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
         if (!supabase || SUPABASE_URL.includes('YOUR_PROJECT_ID')) {
             showToast("Supabase is not initialized. Please configure SUPABASE_URL and SUPABASE_KEY at the top of public/js/app.js.", "error");
-            return;
+            throw new Error("Supabase is not initialized. Check your credentials at the top of public/js/app.js.");
         }
 
         // Fetch config from Supabase config_store table
@@ -231,7 +231,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (error || !data) {
             showToast("Failed to load config from Supabase. Ensure table config_store is initialized.", "error");
             console.error(error);
-            return;
+            throw new Error("Supabase config query failed: " + JSON.stringify(error || 'No Data'));
         }
         config = data.data;
         

@@ -1,6 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        window.onerror = function(msg, url, line) {
+            var errDiv = document.getElementById('debug-err');
+            if (!errDiv) {
+                errDiv = document.createElement('div');
+                errDiv.id = 'debug-err';
+                errDiv.style = 'position:fixed; top:0; left:0; width:100%; background:rgba(255,0,0,0.95); color:white; z-index:999999; padding:15px; font-family:monospace; font-size:12px; word-break:break-all; box-shadow:0 4px 10px rgba(0,0,0,0.5); pointer-events:auto;';
+                document.body.appendChild(errDiv);
+            }
+            errDiv.innerHTML += '<div>Error: ' + msg + ' at ' + url + ':' + line + '</div>';
+            return false;
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            var errDiv = document.getElementById('debug-err');
+            if (!errDiv) {
+                errDiv = document.createElement('div');
+                errDiv.id = 'debug-err';
+                errDiv.style = 'position:fixed; top:0; left:0; width:100%; background:rgba(255,0,0,0.95); color:white; z-index:999999; padding:15px; font-family:monospace; font-size:12px; word-break:break-all; box-shadow:0 4px 10px rgba(0,0,0,0.5); pointer-events:auto;';
+                document.body.appendChild(errDiv);
+            }
+            errDiv.innerHTML += '<div>Promise Error: ' + event.reason + '</div>';
+        });
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Her Story – A Journey of Memories</title>
