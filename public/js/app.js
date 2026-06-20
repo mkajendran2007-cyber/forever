@@ -5,7 +5,7 @@ const SUPABASE_URL = 'https://kvtdwoosektgnoueqohu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_4_eA4UwrykRBYbMrT5wvKw_C-IHdRjI';
 
 // Initialize Supabase Client
-const supabase = (typeof window !== 'undefined' && window.supabase) 
+const supabaseClient = (typeof window !== 'undefined' && window.supabase) 
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) 
     : null;
 
@@ -216,13 +216,13 @@ window.addEventListener('DOMContentLoaded', async () => {
             .catch(err => console.error("Service Worker registration failed", err));
     }
     try {
-        if (!supabase || SUPABASE_URL.includes('YOUR_PROJECT_ID')) {
+        if (!supabaseClient || SUPABASE_URL.includes('YOUR_PROJECT_ID')) {
             showToast("Supabase is not initialized. Please configure SUPABASE_URL and SUPABASE_KEY at the top of public/js/app.js.", "error");
             throw new Error("Supabase is not initialized. Check your credentials at the top of public/js/app.js.");
         }
 
         // Fetch config from Supabase config_store table
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('config_store')
             .select('data')
             .eq('id', 1)
@@ -448,8 +448,8 @@ document.getElementById('lock-form').addEventListener('submit', async (e) => {
 
     try {
         // Fallback: Check if this is the admin password first to unlock edit mode directly
-        if (supabase) {
-            const { data: isAdmin } = await supabase.rpc('verify_admin', { pass: password });
+        if (supabaseClient) {
+            const { data: isAdmin } = await supabaseClient.rpc('verify_admin', { pass: password });
             if (isAdmin) {
                 adminToken = password;
                 localStorage.setItem('adminToken', adminToken);
@@ -603,7 +603,7 @@ async function logReaction(slideId, type) {
 
     try {
         const entry = { slideId, reactionType: type, sessionId, timestamp: new Date().toISOString() };
-        await supabase.rpc('log_analytics', { type_name: 'reaction', entry });
+        await supabaseClient.rpc('log_analytics', { type_name: 'reaction', entry });
     } catch(e) {}
 }
 
@@ -1342,7 +1342,7 @@ document.getElementById('reflection-form').addEventListener('submit', async (e) 
             timestamp: new Date().toISOString(),
             id: Math.random().toString(36).substr(2, 9)
         };
-        const { error } = await supabase.rpc('submit_feedback', { new_feedback: feedbackItem });
+        const { error } = await supabaseClient.rpc('submit_feedback', { new_feedback: feedbackItem });
         if (error) throw error;
 
         if (true) {
@@ -1424,7 +1424,7 @@ async function logVisit() {
     };
 
     try {
-        await supabase.rpc('log_analytics', { type_name: 'visit', entry: body });
+        await supabaseClient.rpc('log_analytics', { type_name: 'visit', entry: body });
     } catch(e) {}
 }
 
@@ -1432,7 +1432,7 @@ async function logAction(action, details) {
     if (isEditMode) return;
     try {
         const entry = { action, details, sessionId, timestamp: new Date().toISOString() };
-        await supabase.rpc('log_analytics', { type_name: 'action', entry });
+        await supabaseClient.rpc('log_analytics', { type_name: 'action', entry });
     } catch(e) {}
 }
 
@@ -1460,7 +1460,7 @@ function setupSectionObserver() {
 async function verifyAdminAuth() {
     if (adminToken) {
         try {
-            const { data: isValid } = await supabase.rpc('verify_admin', { pass: adminToken });
+            const { data: isValid } = await supabaseClient.rpc('verify_admin', { pass: adminToken });
             if (isValid) {
                 unlockEditorMode();
                 return;
@@ -1480,7 +1480,7 @@ async function handleAdminLogin(e) {
     const errorEl = document.getElementById('login-error');
 
     try {
-        const { data: isValid, error } = await supabase.rpc('verify_admin', { pass: password });
+        const { data: isValid, error } = await supabaseClient.rpc('verify_admin', { pass: password });
         if (error) throw error;
 
         if (isValid) {
@@ -1648,7 +1648,7 @@ function setupWYSIWYGListeners() {
 
 // Supabase storage helper
 async function uploadToSupabaseStorage(file) {
-    if (!supabase) {
+    if (!supabaseClient) {
         showToast("Supabase is not configured.", "error");
         return null;
     }
@@ -1657,7 +1657,7 @@ async function uploadToSupabaseStorage(file) {
     const fileExt = file.name ? file.name.split('.').pop() : 'mp3';
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
     
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseClient.storage
         .from('media')
         .upload(fileName, file, {
             cacheControl: '3600',
@@ -1670,7 +1670,7 @@ async function uploadToSupabaseStorage(file) {
     }
     
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = supabaseClient.storage
         .from('media')
         .getPublicUrl(fileName);
         
@@ -1686,7 +1686,7 @@ async function saveVisualEdits() {
             active.blur();
         }
 
-        const { error } = await supabase.rpc('save_config', {
+        const { error } = await supabaseClient.rpc('save_config', {
             pass: adminToken,
             new_config: config
         });
@@ -1954,14 +1954,14 @@ async function updatePrivatePath() {
 async function openStatsSubmissionsModal() {
     try {
         // Fetch public config
-        const { data: configData } = await supabase
+        const { data: configData } = await supabaseClient
             .from('config_store')
             .select('data')
             .eq('id', 1)
             .single();
 
         // Fetch private admin data
-        const { data: adminData, error } = await supabase
+        const { data: adminData, error } = await supabaseClient
             .rpc('get_admin_data', { pass: adminToken });
 
         if (error) {
