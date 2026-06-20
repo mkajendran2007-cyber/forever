@@ -1,4 +1,4 @@
-const CACHE_NAME = 'her-story-cache-v1';
+const CACHE_NAME = 'her-story-cache-v2';
 const ASSETS = [
   '/',
   '/css/style.css',
