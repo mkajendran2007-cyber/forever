@@ -23,7 +23,7 @@ let statsObserver = null;
 let currentSection = "LockScreen";
 
 // Admin / Edit Mode States
-let isEditMode = (window.location.pathname === '/admin' || window.location.pathname === '/admin.html' || window.location.search.includes('edit=true'));
+let isEditMode = (window.location.pathname.replace(/\/$/, '') === '/admin' || window.location.pathname.replace(/\/$/, '') === '/admin.html' || window.location.search.includes('edit=true'));
 let adminToken = localStorage.getItem('adminToken') || '';
 let editPhotoContext = null; // { type, id, element }
 
@@ -447,6 +447,19 @@ document.getElementById('lock-form').addEventListener('submit', async (e) => {
     const errorEl = document.getElementById('lock-error');
 
     try {
+        // Fallback: Check if this is the admin password first to unlock edit mode directly
+        if (supabase) {
+            const { data: isAdmin } = await supabase.rpc('verify_admin', { pass: password });
+            if (isAdmin) {
+                adminToken = password;
+                localStorage.setItem('adminToken', adminToken);
+                if (soundSynth) soundSynth.playTwinkle();
+                document.getElementById('lock-screen').classList.add('hidden');
+                unlockEditorMode();
+                return;
+            }
+        }
+
         if (password === config.settings.password) {
             soundSynth.playTwinkle();
             document.getElementById('lock-screen').classList.add('hidden');
