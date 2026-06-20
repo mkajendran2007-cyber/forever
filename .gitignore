@@ -4,3 +4,5 @@ supabase_setup.sql
 database.json
 package-lock.json
 server.js
+
+.vercel
