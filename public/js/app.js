@@ -1,4 +1,5 @@
 // Supabase Integration Config
+// Verified serverless Supabase backend and Vercel routing configuration
 // Paste your Supabase credentials here:
 const SUPABASE_URL = 'https://kvtdwoosektgnoueqohu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_4_eA4UwrykRBYbMrT5wvKw_C-IHdRjI';
