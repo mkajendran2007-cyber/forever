@@ -1,0 +1,6 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/((?!css|js|manifest.json|sw.js).*)", "destination": "/builder.html" }
+  ]
+}

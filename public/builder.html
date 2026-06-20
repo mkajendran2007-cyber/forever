@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Her Story – A Journey of Memories</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&family=Inter:wght@300;400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff5e7e">
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- Stars Particles Canvas (Behind Everything) -->
+    <canvas id="canvas-particles"></canvas>
+
+    <!-- FLOATING VISUAL EDITOR CONTROLS (Admin only) -->
+    <div id="admin-editor-bar" class="admin-editor-bar hidden">
+        <div class="admin-bar-content">
+            <span class="admin-logo">✨ Visual Editor Panel</span>
+            <div class="admin-bar-actions">
+                <select id="cfg-gender-select" class="btn-admin-bar" style="outline: none; padding-right: 28px; background: rgba(9, 9, 14, 0.95); cursor: pointer;">
+                    <option value="her" style="background: #111; color: #fff;">♀️ Her / She</option>
+                    <option value="him" style="background: #111; color: #fff;">♂️ Him / He</option>
+                </select>
+                <select id="cfg-theme-select" class="btn-admin-bar" style="outline: none; padding-right: 28px; background: rgba(9, 9, 14, 0.95); cursor: pointer;">
+                    <option value="rose" style="background: #111; color: #fff;">🌹 Romantic Rose</option>
+                    <option value="midnight" style="background: #111; color: #fff;">🌌 Midnight Dream</option>
+                    <option value="neon" style="background: #111; color: #fff;">⚡ Neon Glow</option>
+                    <option value="pastel" style="background: #111; color: #fff;">🎨 Pastel Vintage</option>
+                </select>
+                 <button id="btn-visual-reorder" class="btn-admin-bar" onclick="openAdminModal('reorder')">🔧 Rearrange</button>
+                 <button id="btn-visual-save" class="btn-admin-bar">💾 Save</button>
+                 <button id="btn-visual-upload-photos" class="btn-admin-bar">📷 Photos</button>
+                 <button id="btn-visual-upload-music" class="btn-admin-bar">🎵 Music</button>
+                 <button id="btn-visual-upload-voice" class="btn-admin-bar">🎙️ Voice</button>
+                 <button id="btn-visual-share" class="btn-admin-bar">🔗 Share</button>
+                 <button id="btn-visual-stats" class="btn-admin-bar">📊 Stats</button>
+                 <button id="btn-visual-logout" class="btn-admin-bar logout">Logout</button>
+             </div>
+         </div>
+     </div>
+
+    <!-- Background Audio Controller -->
+    <div id="audio-control" class="audio-control hidden">
+        <button id="btn-mute" class="btn-audio" aria-label="Mute Music">
+            <svg class="icon-volume-on" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            <svg class="icon-volume-off hidden" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+        </button>
+        <div class="volume-slider-container">
+            <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5">
+        </div>
+    </div>
+
+    <!-- HIDDEN AUDIO FILE PICKERS FOR DIRECT UPLOADS (Admin only) -->
+    <input type="file" id="cfg-music-file" accept="audio/*" style="display:none;">
+    <input type="file" id="cfg-voice-file" accept="audio/*" style="display:none;">
+    <input type="file" id="general-image-file" accept="image/*" style="display:none;">
+
+    <!-- 1. PASSWORD LOCK SCREEN -->
+    <div id="lock-screen" class="full-screen-overlay active">
+        <div class="glass-card lock-card text-center animate-fade-in">
+            <div class="heart-pulse-icon">❤️</div>
+            <h1 class="font-luxury glow-text" id="edit-brand-title" contenteditable="false">Her Story</h1>
+            <p class="subtitle" id="edit-brand-subtitle" contenteditable="false">A Journey of Memories</p>
+            <p class="lock-hint">Only one special person can enter this journey...</p>
+            
+            <form id="lock-form" class="lock-form">
+                <div class="input-container">
+                    <input type="password" id="site-password" placeholder="Enter Secret Password" required autocomplete="current-password">
+                    <span class="focus-border"></span>
+                </div>
+                <button type="submit" class="btn-primary">Unlock Journey</button>
+            </form>
+            <p id="lock-error" class="lock-error hidden"></p>
+        </div>
+    </div>
+
+    <!-- 2. COUNTDOWN REVEAL SCREEN -->
+    <div id="countdown-screen" class="full-screen-overlay hidden">
+        <div class="glass-card countdown-card text-center">
+            <h2 class="font-luxury glow-text" id="edit-countdown-heading" contenteditable="false">Something special is waiting for you...</h2>
+            <div id="rotating-messages" class="rotating-message">Someone spent a lot of time creating this for you ❤️</div>
+            
+            <div class="countdown-timer">
+                <div class="time-block">
+                    <span id="cd-days" class="number">00</span>
+                    <span class="label">Days</span>
+                </div>
+                <div class="time-block">
+                    <span id="cd-hours" class="number">00</span>
+                    <span class="label">Hours</span>
+                </div>
+                <div class="time-block">
+                    <span id="cd-minutes" class="number">00</span>
+                    <span class="label">Mins</span>
+                </div>
+                <div class="time-block">
+                    <span id="cd-seconds" class="number">00</span>
+                    <span class="label">Secs</span>
+                </div>
+            </div>
+            
+            <p class="countdown-footer">Opening Soon ❤️</p>
+        </div>
+    </div>
+
+    <!-- 3. OPENING CINEMATIC INTRO -->
+    <div id="intro-screen" class="full-screen-overlay hidden black-bg">
+        <div class="intro-container">
+            <div id="intro-text-1" class="intro-text-line hidden" contenteditable="false">In a world full of ordinary moments...</div>
+            <div id="intro-text-2" class="intro-text-line hidden" contenteditable="false">One person made those moments unforgettable...</div>
+            <div id="intro-text-3" class="intro-text-line hidden" contenteditable="false">Today is her day.</div>
+            <div id="intro-final-glow" class="intro-final-glow hidden">
+                <h1 class="glow-text text-animated">HAPPY BIRTHDAY <span id="recipient-greeting-name">ADITI</span> ❤️</h1>
+                <button id="btn-start-journey" class="btn-primary btn-large pulse-btn">Start Journey</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER (Scrollable) -->
+    <main id="main-experience" class="hidden">
+
+        <!-- SECTION 1: FRIENDSHIP TIMELINE -->
+        <section id="sec-timeline" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">01</span>
+                <h2 class="font-luxury section-title">Friendship Timeline</h2>
+                <p class="section-subtitle">A journey through our favorite chapters</p>
+                <div class="admin-edit-controls hidden">
+                    <button class="btn-admin-action" onclick="addTimelineSlide()">➕ Add Slide</button>
+                </div>
+            </div>
+            <div class="timeline-container">
+                <button class="slider-btn prev" id="timeline-prev">←</button>
+                <div class="timeline-wrapper" id="timeline-wrapper">
+                    <!-- Slides loaded dynamically via JS -->
+                </div>
+                <button class="slider-btn next" id="timeline-next">→</button>
+            </div>
+        </section>
+
+        <!-- SECTION 2: POLAROID MEMORY WALL -->
+        <section id="sec-polaroids" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">02</span>
+                <h2 class="font-luxury section-title">Polaroid Memory Wall</h2>
+                <p class="section-subtitle">Drag them, spin them, scatter them around</p>
+                <div class="admin-edit-controls hidden">
+                    <input type="file" id="bulk-photos-input" accept="image/*" multiple style="display:none;" onchange="handleBulkPhotosUpload()">
+                    <button class="btn-admin-action" onclick="document.getElementById('bulk-photos-input').click()">➕ Bulk Upload Photos</button>
+                </div>
+            </div>
+            <div class="polaroid-canvas" id="polaroid-canvas">
+                <!-- Draggable Polaroids loaded dynamically via JS -->
+            </div>
+            <div id="bulk-upload-status" class="upload-status hidden text-center" style="margin-top:15px;"></div>
+            <div class="scrapbook-deco">Double-click polaroid to enlarge | Edit captions on cards</div>
+        </section>
+
+        <!-- SECTION 3: FRIENDSHIP STATS -->
+        <section id="sec-stats" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">03</span>
+                <h2 class="font-luxury section-title">Our Friendship Stats</h2>
+                <p class="section-subtitle">Our bond in numbers</p>
+            </div>
+            <div class="stats-grid">
+                <div class="glass-card stat-card">
+                    <div class="stat-icon">📅</div>
+                    <h3 class="stat-number" id="stat-days" data-target="0">0</h3>
+                    <p class="stat-label">Days of Friendship</p>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-icon">📸</div>
+                    <h3 class="stat-number elegant-infinity" id="stat-photos">∞</h3>
+                    <p class="stat-label">Photos Taken</p>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-icon">😂</div>
+                    <h3 class="stat-number" id="stat-laughs" data-target="0">0</h3>
+                    <p class="stat-label">Laughs Shared</p>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-icon">❤️</div>
+                    <h3 class="stat-number elegant-infinity" id="stat-memories">∞</h3>
+                    <p class="stat-label">Memories Created</p>
+                </div>
+            </div>
+            <!-- Statistics editor inputs in Edit Mode -->
+            <div class="admin-stats-editor hidden glass-card" style="max-width:500px; margin: 30px auto 0;">
+                <h4 style="margin-bottom:15px; color:var(--primary-color);">Edit Stats Counter Targets</h4>
+                <div class="form-row-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <input type="number" id="input-stat-days" placeholder="Days of Friendship">
+                    <input type="number" id="input-stat-laughs" placeholder="Laughs Shared">
+                </div>
+            </div>
+            <div class="stats-footer text-center">
+                <p class="stat-badge">Friendship Level: <span class="badge-gold">LEGENDARY ❤️</span></p>
+            </div>
+        </section>
+
+        <!-- SECTION 4: INTERACTIVE FUN QUESTIONS -->
+        <section id="sec-questions" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">04</span>
+                <h2 class="font-luxury section-title">Fun Questions</h2>
+                <p class="section-subtitle">Let's see if we agree...</p>
+            </div>
+            <div class="questions-container">
+                <!-- Question 1 -->
+                <div class="glass-card question-card" id="q-card-1">
+                    <p class="question-text" id="edit-q-text-1" contenteditable="false">Am I a good friend?</p>
+                    <div class="question-buttons">
+                        <button class="btn-question btn-yes" onclick="answerQuestion(1, true)">YES</button>
+                        <button class="btn-question btn-no" onclick="answerQuestion(1, false)">NO</button>
+                    </div>
+                    <p class="question-response hidden" id="q-resp-1"></p>
+                </div>
+                <!-- Question 2 -->
+                <div class="glass-card question-card" id="q-card-2">
+                    <p class="question-text" id="edit-q-text-2" contenteditable="false">Do I annoy you?</p>
+                    <div class="question-buttons">
+                        <button class="btn-question btn-yes" onclick="answerQuestion(2, true)">YES</button>
+                        <button class="btn-question btn-no" onclick="answerQuestion(2, false)">NO</button>
+                    </div>
+                    <p class="question-response hidden" id="q-resp-2"></p>
+                </div>
+                <!-- Question 3 -->
+                <div class="glass-card question-card" id="q-card-3">
+                    <p class="question-text" id="edit-q-text-3" contenteditable="false">Will you miss me after college?</p>
+                    <div class="question-buttons">
+                        <button class="btn-question btn-yes" onclick="answerQuestion(3, true)">YES</button>
+                        <button class="btn-question btn-no" onclick="answerQuestion(3, false)">NO</button>
+                    </div>
+                    <p class="question-response hidden" id="q-resp-3"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: SECRET ENVELOPES -->
+        <section id="sec-envelopes" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">05</span>
+                <h2 class="font-luxury section-title">Secret Envelopes</h2>
+                <p class="section-subtitle">Click to read secret notes meant only for you</p>
+                <div class="admin-edit-controls hidden">
+                    <button class="btn-admin-action" onclick="addEnvelope()">➕ Add Envelope</button>
+                </div>
+            </div>
+            <div class="envelopes-grid" id="envelopes-grid">
+                <!-- Loaded Dynamically -->
+            </div>
+        </section>
+
+        <!-- SECTION 6: MEMORY MAP -->
+        <section id="sec-map" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">06</span>
+                <h2 class="font-luxury section-title">Memory Map</h2>
+                <p class="section-subtitle">The coordinates of our friendship (Admin can click map to relocate pins)</p>
+            </div>
+            <div class="map-wrapper glass-card">
+                <div class="map-container" id="map-container">
+                    <!-- Map SVG Background -->
+                    <svg class="map-background" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <path id="map-path-line" d="M 20,30 Q 30,15 45,25 T 70,50 T 35,75 T 85,80" fill="none" stroke="rgba(255,209,220,0.5)" stroke-width="0.8" stroke-dasharray="2,2"/>
+                    </svg>
+                    <!-- Pulse pins dynamically loaded -->
+                </div>
+                <div class="map-detail-card hidden" id="map-detail-card">
+                    <button class="close-detail" id="btn-close-map-detail">×</button>
+                    <h4 id="map-location-title" class="font-luxury" contenteditable="false">Location</h4>
+                    <p id="map-location-memory" contenteditable="false">Memory details...</p>
+                    <div id="map-location-photo" class="map-photo-frame hidden"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 7: SPECIAL DREAM -->
+        <section id="sec-dream" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">07</span>
+                <h2 class="font-luxury section-title">A Special Dream</h2>
+                <p class="section-subtitle">Before college ends...</p>
+            </div>
+            <div class="dream-banner glass-card">
+                <div class="dream-sky">
+                    <div class="clouds-container">
+                        <div class="cloud cloud-1">☁️</div>
+                        <div class="cloud cloud-2">☁️</div>
+                        <div class="cloud cloud-3">☁️</div>
+                    </div>
+                    <div class="dream-sun"></div>
+                </div>
+                <div class="dream-content text-center">
+                    <p class="dream-text-line" id="edit-dream-lead" contenteditable="false">Before college ends...</p>
+                    <h3 class="dream-heading font-luxury" id="edit-dream-body" contenteditable="false">Can we recreate the <span class="highlight-rose">Kadhaippoma</span> travel scene and create one unforgettable memory together?</h3>
+                </div>
+                <div class="dream-road-wrapper">
+                    <div class="dream-road">
+                        <div class="road-strips"></div>
+                        <div class="car-animation">🚗</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 8: TIME CAPSULE -->
+        <section id="sec-capsule" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">08</span>
+                <h2 class="font-luxury section-title">Time Capsule</h2>
+                <p class="section-subtitle">How long we've stood the test of time</p>
+            </div>
+            <div class="glass-card capsule-card text-center">
+                <p class="capsule-date-label">We met on <span id="capsule-meet-date" class="highlight-date">June 20, 2023</span></p>
+                <div class="admin-capsule-editor hidden" style="margin: 15px auto; max-width: 300px;">
+                    <label for="input-meet-date" style="display:block; font-size:0.85rem; color:var(--text-muted); margin-bottom:5px;">Change Meeting Date:</label>
+                    <input type="date" id="input-meet-date" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; border-radius: 8px; outline: none; text-align: center;">
+                </div>
+                <div class="capsule-counter">
+                    <div class="capsule-item">
+                        <span id="cap-years" class="cap-num">0</span>
+                        <span class="cap-lbl">Years</span>
+                    </div>
+                    <div class="capsule-item">
+                        <span id="cap-months" class="cap-num">0</span>
+                        <span class="cap-lbl">Months</span>
+                    </div>
+                    <div class="capsule-item">
+                        <span id="cap-days" class="cap-num">0</span>
+                        <span class="cap-lbl">Days</span>
+                    </div>
+                    <div class="capsule-item">
+                        <span id="cap-hours" class="cap-num">0</span>
+                        <span class="cap-lbl">Hours</span>
+                    </div>
+                    <div class="capsule-item">
+                        <span id="cap-minutes" class="cap-num">0</span>
+                        <span class="cap-lbl">Mins</span>
+                    </div>
+                    <div class="capsule-item">
+                        <span id="cap-seconds" class="cap-num">0</span>
+                        <span class="cap-lbl">Secs</span>
+                    </div>
+                </div>
+                <p class="capsule-footer">...and counting! ⏳</p>
+                <button id="btn-export-memory" class="btn-primary" style="margin-top:15px; padding: 8px 16px; font-size: 0.85rem; border-radius: 20px;">📥 Save Memory Card</button>
+            </div>
+        </section>
+
+        <!-- SECTION 9: MIRROR OF APPRECIATION -->
+        <section id="sec-appreciation" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">09</span>
+                <h2 class="font-luxury section-title">Mirror of Appreciation</h2>
+                <p class="section-subtitle">What makes you incredibly special (Click glass panes to reveal)</p>
+                <div class="admin-edit-controls hidden">
+                    <button class="btn-admin-action" onclick="addCompliment()">➕ Add Compliment</button>
+                </div>
+            </div>
+            <div class="mirror-grid" id="mirror-grid">
+                <!-- Compliments loaded dynamically -->
+            </div>
+        </section>
+
+        <!-- SECTION 10: FUTURE MEMORIES -->
+        <section id="sec-future" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">10</span>
+                <h2 class="font-luxury section-title">Future Memories</h2>
+                <p class="section-subtitle">Still loading... Our bucket list</p>
+                <div class="admin-edit-controls hidden">
+                    <button class="btn-admin-action" onclick="addChecklistItem()">➕ Add Goal</button>
+                </div>
+            </div>
+            <div class="checklist-container glass-card">
+                <ul class="bucket-list" id="bucket-list">
+                    <!-- Checklist items loaded dynamically -->
+                </ul>
+            </div>
+        </section>
+
+        <!-- SECTION 11: VOICE MESSAGE -->
+        <section id="sec-voice" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">11</span>
+                <h2 class="font-luxury section-title">Voice Message</h2>
+                <p class="section-subtitle">Listen to a secret message</p>
+                <div class="admin-edit-controls hidden" style="margin-top:10px;">
+                    <button class="btn-admin-action" onclick="document.getElementById('cfg-voice-file').click()">🎙️ Upload Voice MP3</button>
+                    <button id="btn-record-voice" class="btn-admin-action">🎙️ Record Live</button>
+                    <button class="btn-admin-action logout hidden" id="btn-delete-voice" onclick="deleteVoiceNote()">🗑️ Delete Voice Note</button>
+                </div>
+            </div>
+            <div class="voice-card-container glass-card text-center" id="voice-card">
+                <button id="btn-play-voice" class="btn-voice-play">
+                    <span class="play-icon">▶</span>
+                    <span class="pause-icon hidden">⏸</span>
+                </button>
+                <div class="soundwave-container" id="soundwave">
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                </div>
+                <p class="voice-instruction">Click to listen to a heartfelt secret message</p>
+            </div>
+            <audio id="secret-voice-audio" class="hidden"></audio>
+        </section>
+
+        <!-- SECTION 12: INTERACTIVE TRIVIA QUIZ -->
+        <section id="sec-quiz" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">12</span>
+                <h2 class="font-luxury section-title">Interactive Trivia Quiz</h2>
+                <p class="section-subtitle">Answer these questions to unlock your surprise!</p>
+            </div>
+            
+            <div class="glass-card quiz-card text-center" style="max-width:600px; margin:0 auto; padding:30px;">
+                <div id="quiz-play-view">
+                    <div class="quiz-progress" id="quiz-progress-text">Question 1 of 3</div>
+                    <div class="quiz-question-box font-luxury" id="quiz-question-display">Where did we first meet?</div>
+                    <div class="quiz-options-list" id="quiz-options-container">
+                        <!-- Options generated dynamically -->
+                    </div>
+                    <div class="quiz-feedback-text" id="quiz-feedback-display"></div>
+                </div>
+                <div id="quiz-completed-view" class="hidden">
+                    <div style="font-size:3.5rem; margin-bottom:15px; animation: heartBeat 1.2s infinite;">🔓</div>
+                    <h3 class="font-luxury glow-text" style="font-size:1.8rem; margin-bottom:10px;">Surprise Unlocked! ❤️</h3>
+                    <p style="color:var(--text-muted); margin-bottom:20px;">You answered all questions correctly! Scroll down to open your gift.</p>
+                    <button class="btn-primary" onclick="scrollToGift()">Open Surprise Gift Box 🎁</button>
+                </div>
+            </div>
+
+            <!-- Quiz Creator in Visual Editor Mode -->
+            <div class="admin-quiz-editor hidden glass-card text-center">
+                <h4 style="margin-bottom:15px; color:var(--primary-color);">Visual Quiz Configurator</h4>
+                <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">Customize questions, choices, and mark the correct choice for the quiz.</p>
+                <div id="quiz-edit-cards-container" style="display:flex; flex-direction:column; gap:15px;">
+                    <!-- Dynamic edit cards generated via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 13: SURPRISE GIFT BOX -->
+        <section id="sec-gift" class="experience-section">
+            <div class="section-header text-center">
+                <span class="section-number">13</span>
+                <h2 class="font-luxury section-title">Surprise Gift Box</h2>
+                <p class="section-subtitle">Tap the box to open your surprise</p>
+            </div>
+            <div class="gift-box-wrapper">
+                <div class="gift-box" id="gift-box">
+                    <div class="gift-lid"></div>
+                    <div class="gift-ribbon"></div>
+                    <div class="gift-body"></div>
+                </div>
+            </div>
+            <div class="gift-reveal-card glass-card hidden" id="gift-reveal">
+                <h3 class="font-luxury text-center">Your Special Birthday Wish 🌸</h3>
+                <p class="gift-wish-text text-center" id="edit-gift-wish" contenteditable="false">"Wishing you a year filled with infinite laughter, success that reaches the stars, and a friendship that keeps growing stronger every day. Thank you for being the amazing soul that you are! Happy Birthday! ❤️"</p>
+            </div>
+        </section>
+
+        <!-- SECTION 13: FINAL HEART MOMENT -->
+        <section id="sec-heart" class="experience-section dark-gradient-bg">
+            <div class="heart-container text-center">
+                <div class="giant-glowing-heart" id="giant-heart">❤️</div>
+                <p class="heart-quote-1 font-luxury" id="edit-heart-quote-1" contenteditable="false">Among all the people I've met...</p>
+                <p class="heart-quote-2" id="edit-heart-quote-2" contenteditable="false">You became one of the most special.</p>
+                <button id="btn-heart-continue" class="btn-primary pulse-btn">Continue ❤️</button>
+            </div>
+        </section>
+
+        <!-- SECTION 14: FINAL QUESTION -->
+        <section id="sec-final-question" class="experience-section">
+            <div class="final-question-container glass-card text-center">
+                <h2 class="font-luxury glow-text" id="edit-final-question-text" contenteditable="false">Will you always be in my life?</h2>
+                <div class="final-buttons">
+                    <button id="btn-final-yes" class="btn-final-action">YES ALWAYS ❤️</button>
+                    <button id="btn-final-no" class="btn-final-action">CAN'T ESCAPE ME 😆</button>
+                </div>
+                <div class="final-response-box hidden" id="final-response-box">
+                    <p class="final-response-text" id="final-response-text"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 15: GRAND FINALE -->
+        <section id="sec-finale" class="experience-section black-bg">
+            <div class="finale-credits" id="finale-credits">
+                <div class="credit-block">
+                    <span class="credit-role">DIRECTOR</span>
+                    <span class="credit-name" id="edit-finale-director" contenteditable="false">Kaja</span>
+                </div>
+                <div class="credit-block">
+                    <span class="credit-role">MAIN CHARACTER</span>
+                    <span class="credit-name" id="finale-her-name" contenteditable="false">Aditi</span>
+                </div>
+                <div class="credit-block">
+                    <span class="credit-role">SPECIAL THANKS</span>
+                    <span class="credit-phrase finale-thanks-edit" id="finale-thanks-1" data-index="0" contenteditable="false">For every memory.</span>
+                    <span class="credit-phrase finale-thanks-edit" id="finale-thanks-2" data-index="1" contenteditable="false">For every laugh.</span>
+                    <span class="credit-phrase finale-thanks-edit" id="finale-thanks-3" data-index="2" contenteditable="false">For every moment.</span>
+                </div>
+                <div class="credit-block ending-line">
+                    <span class="credit-ending finale-ending-edit" id="finale-ending-line" contenteditable="false">The End...</span>
+                    <span class="credit-next-chapter finale-next-edit" id="finale-next-chapter" contenteditable="false">Or Maybe Just Another Chapter...</span>
+                </div>
+                <button id="btn-finale-continue" class="btn-primary">Continue ❤️</button>
+            </div>
+            <div class="collage-container hidden" id="finale-collage">
+                <!-- Floating photo collage -->
+            </div>
+            <div class="grand-wish hidden" id="finale-wish">
+                <h1 class="glow-text text-animated">❤️ THANK YOU FOR BEING YOU ❤️</h1>
+            </div>
+        </section>
+
+        <!-- SECTION 16: FINAL REFLECTION PAGE -->
+        <section id="sec-reflection" class="experience-section">
+            <div class="reflection-container glass-card">
+                <h2 class="font-luxury glow-text text-center">Before You Leave... ❤️</h2>
+                <p class="text-center reflection-subtitle">I've shared my memories. Now I'd love to know yours.</p>
+                
+                <form id="reflection-form">
+                    <div class="form-group">
+                        <label class="form-question">What kind of person am I to you?</label>
+                        <div class="ratings-list">
+                            <div class="rating-item"><span class="rating-label">❤️ Caring</span><div class="stars-rating" data-category="caring"><span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span></div></div>
+                            <div class="rating-item"><span class="rating-label">😂 Funny</span><div class="stars-rating" data-category="funny"><span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span></div></div>
+                            <div class="rating-item"><span class="rating-label">🤝 Trustworthy</span><div class="stars-rating" data-category="trustworthy"><span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span></div></div>
+                            <div class="rating-item"><span class="rating-label">🌟 Supportive</span><div class="stars-rating" data-category="supportive"><span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span></div></div>
+                            <div class="rating-item"><span class="rating-label">😊 Kind</span><div class="stars-rating" data-category="kind"><span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span></div></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-question">How do you feel after seeing this surprise?</label>
+                        <div class="feelings-checklist">
+                            <label class="feeling-chip"><input type="checkbox" name="feelings" value="Happy"><span>❤️ Happy</span></label>
+                            <label class="feeling-chip"><input type="checkbox" name="feelings" value="Emotional"><span>🥹 Emotional</span></label>
+                            <label class="feeling-chip"><input type="checkbox" name="feelings" value="Funny"><span>😂 Funny</span></label>
+                            <label class="feeling-chip"><input type="checkbox" name="feelings" value="Special"><span>🌟 Special</span></label>
+                            <label class="feeling-chip"><input type="checkbox" name="feelings" value="Grateful"><span>🤗 Grateful</span></label>
+                            <label class="feeling-chip"><input type="checkbox" name="feelings" value="Lucky"><span>💖 Lucky</span></label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-question" for="field-memory">What memory of us comes to your mind first?</label>
+                        <textarea id="field-memory" placeholder="Type your favorite memory here..." rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-question" for="field-letter">Is there anything you'd like to tell me?</label>
+                        <textarea id="field-letter" placeholder="Write anything from your heart..." rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-question" for="field-future">What do you hope for our friendship in the future?</label>
+                        <textarea id="field-future" placeholder="Write your hopes here..." rows="3"></textarea>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn-primary btn-large" id="btn-submit-reflection">Send Your Thoughts ❤️</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- SECTION 17: FINAL SECRET MESSAGE -->
+        <section id="sec-secret-final" class="experience-section black-bg hidden">
+            <div class="final-letter-overlay text-center animate-fade-in">
+                <div class="space-stars"></div>
+                <h2 class="font-luxury glow-text">Thank you for taking this journey.</h2>
+                <div class="final-scrolling-text">
+                    <p class="fade-line">No matter where life takes us...</p>
+                    <p class="fade-line">The memories will always remain.</p>
+                    <p class="fade-line">And you will always be one of my favorite chapters. ❤️</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ADMIN ACCESS GATE LOGIN MODAL (Admin only) -->
+    <div id="admin-login-overlay" class="admin-login-overlay hidden">
+        <div class="glass-card admin-login-card text-center">
+            <h2 class="font-luxury glow-text" style="margin-bottom:10px;">Visual Editor Login</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">Enter your admin password to visually customize the experience</p>
+            <form id="admin-login-form">
+                <div class="input-container" style="margin-bottom:15px;">
+                    <input type="password" id="admin-password" placeholder="Admin Password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-admin-submit">Authenticate</button>
+            </form>
+            <p id="login-error" class="login-error hidden" style="color:#ff6b6b; margin-top:10px; font-size:0.9rem;"></p>
+        </div>
+    </div>
+
+    <!-- ADMIN SHARE DIALOG MODAL (Admin only) -->
+    <div id="admin-share-overlay" class="admin-modal-overlay hidden">
+        <div class="glass-card admin-modal-card">
+            <button class="close-modal" onclick="closeAdminModal('share')">×</button>
+            <h2 class="font-luxury glow-text text-center">Generate & Share Link</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px; text-align:center;">Copy the private link below and send it to your friend.</p>
+            
+            <div class="form-row">
+                <label>Private Surpise Link URL</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="share-link-input" readonly style="flex-grow:1; background:#000;">
+                    <button class="btn-admin-bar" onclick="copyShareLink()">Copy</button>
+                </div>
+            </div>
+            
+            <div class="form-row" style="margin-top:20px;">
+                <label for="cfg-private-path">Custom Private URL Path</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <span style="color:var(--text-muted); font-size:0.95rem;">website.com/</span>
+                    <input type="text" id="cfg-private-path" placeholder="e.g. aditis-birthday">
+                    <button class="btn-admin-bar" onclick="updatePrivatePath()">Update</button>
+                </div>
+                <small style="color:var(--text-muted);">Changing this changes the private URL path name.</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN SUBMISSIONS VIEW MODAL (Admin only) -->
+    <div id="admin-stats-overlay" class="admin-modal-overlay hidden">
+        <div class="glass-card admin-modal-card large-modal">
+            <button class="close-modal" onclick="closeAdminModal('stats')">×</button>
+            <h2 class="font-luxury glow-text">Visitor Stats & Submissions</h2>
+            
+            <div class="stats-overview-grid" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin: 20px 0;">
+                <div class="glass-card text-center" style="padding:15px;">
+                    <h5 style="color:var(--text-muted);">Total Hits</h5>
+                    <p style="font-size:1.8rem; font-weight:700;" id="stat-total-hits">0</p>
+                </div>
+                <div class="glass-card text-center" style="padding:15px;">
+                    <h5 style="color:var(--text-muted);">Unique Visitors</h5>
+                    <p style="font-size:1.8rem; font-weight:700;" id="stat-unique-hits">0</p>
+                </div>
+                <div class="glass-card text-center" style="padding:15px;">
+                    <h5 style="color:var(--text-muted);">First Open Date</h5>
+                    <p style="font-size:0.9rem; font-weight:600; margin-top:5px; line-height:1.3;" id="stat-first-open">Waiting...</p>
+                </div>
+            </div>
+
+            <!-- Neon Glowing SVG Charts -->
+            <div class="stats-charts-row" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:25px;">
+                <div class="glass-card" style="padding:20px; text-align:center; background:rgba(0,0,0,0.2);">
+                    <h4 style="color:var(--primary-color); font-size:1rem; margin-bottom:15px;">Hourly Visits (Last 24h)</h4>
+                    <div style="height:160px; position:relative; display:flex; align-items:flex-end; justify-content:space-between;" id="analytics-bar-chart-container">
+                        <!-- SVG Bar Chart dynamically loaded -->
+                    </div>
+                </div>
+                <div class="glass-card" style="padding:20px; text-align:center; background:rgba(0,0,0,0.2);">
+                    <h4 style="color:var(--primary-color); font-size:1rem; margin-bottom:15px;">Visitor Feelings Breakdown</h4>
+                    <div style="height:160px; display:flex; justify-content:center; align-items:center;" id="analytics-doughnut-chart-container">
+                        <!-- SVG Doughnut Chart dynamically loaded -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-justify" style="margin-bottom:15px;">
+                <h3>Submissions Received</h3>
+                <a id="btn-export-csv" href="#" class="btn-admin-bar" style="text-decoration:none;">Download CSV</a>
+            </div>
+            
+            <div class="submissions-list-container" id="admin-submissions-list" style="max-height:300px; overflow-y:auto; padding-right:5px;">
+                <p class="text-center no-data">No submissions received yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN REORDER SECTIONS DIALOG (Admin only) -->
+    <div id="admin-reorder-overlay" class="admin-modal-overlay hidden">
+        <div class="glass-card admin-modal-card">
+            <button class="close-modal" onclick="closeAdminModal('reorder')">×</button>
+            <h2 class="font-luxury glow-text text-center">Rearrange Experience Sections</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px; text-align:center;">Use up/down buttons to reorder how the sections flow for the recipient.</p>
+            
+            <div id="reorder-sections-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:25px; max-height:350px; overflow-y:auto; padding-right:5px;">
+                <!-- Sorted list items loaded dynamically via JS -->
+            </div>
+            
+            <div class="text-center">
+                <button class="btn-primary" onclick="closeAdminModal('reorder')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- In-Browser Voice Recorder Overlay Modal -->
+    <div id="recorder-overlay" class="recorder-overlay hidden">
+        <div class="glass-card recorder-card text-center">
+            <h3 class="font-luxury glow-text">🎙️ Record Live Message</h3>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:15px;">Grant microphone permissions to record your voice note.</p>
+            
+            <div class="recorder-timer" id="recorder-timer">00:00</div>
+            
+            <div class="recorder-waveform" id="recorder-waveform">
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+                <div class="recorder-bar"></div>
+            </div>
+            
+            <button id="btn-record-mic" class="btn-record-action">⏺️</button>
+            <p class="recorder-status-text" id="recorder-status">Ready to record</p>
+            
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:25px;">
+                <button id="btn-recorder-cancel" class="btn-admin-bar">Cancel</button>
+                <button id="btn-recorder-save" class="btn-admin-bar" disabled style="opacity:0.5;">Use Recording</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Eye Blink Animation Overlay -->
+    <div id="eye-blink-overlay" class="eye-overlay hidden">
+        <div class="eyelid eyelid-top"></div>
+        <div class="eyelid eyelid-bottom"></div>
+    </div>
+
+    <!-- JS Core -->
+    <script src="js/app.js"></script>
+</body>
+</html>
