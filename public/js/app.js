@@ -210,10 +210,21 @@ animateParticles();
 
 // Fetch configurations and initialize UI elements
 window.addEventListener('DOMContentLoaded', async () => {
+    // Unregister any active service workers to prevent cache traps
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-            .then(() => console.log("Service Worker Registered"))
-            .catch(err => console.error("Service Worker registration failed", err));
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let registration of registrations) {
+                registration.unregister();
+            }
+        }).catch(err => console.error("Failed to unregister SW:", err));
+    }
+    // Clear browser caches
+    if ('caches' in window) {
+        caches.keys().then(keys => {
+            for (let key of keys) {
+                caches.delete(key);
+            }
+        }).catch(err => console.error("Failed to clear caches:", err));
     }
     try {
         if (!supabaseClient || SUPABASE_URL.includes('YOUR_PROJECT_ID')) {
@@ -559,7 +570,7 @@ function setupTimeline() {
                 <div class="photo-frame-container">
                     <img class="photo-frame-img" src="${slide.photoUrl}" alt="${slide.title}">
                 </div>
-                ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('timeline', '${slide.id}', this)">📷 Change</button>` : ''}
+                ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('timeline', '${slide.id}', this, event)">📷 Change</button>` : ''}
             </div>
             <div class="timeline-slide-content">
                 <h3 class="timeline-slide-title font-luxury timeline-title-edit" contenteditable="${isEditMode}">${slide.title}</h3>
@@ -597,8 +608,11 @@ function setupTimeline() {
     });
 }
 
-async function logReaction(slideId, type) {
-    event.target.classList.add('active');
+async function logReaction(slideId, type, event) {
+    const e = event || window.event;
+    if (e && e.target) {
+        e.target.classList.add('active');
+    }
     if (soundSynth) soundSynth.playTwinkle();
 
     try {
@@ -624,7 +638,7 @@ function setupPolaroids() {
                 <div class="polaroid-img-container" style="height:100%;">
                     <img src="${pol.url}" alt="${pol.caption}" draggable="false" style="width:100%; height:100%; object-fit:cover;">
                 </div>
-                ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('polaroid', '${pol.id}', this)">📷 Change</button>` : ''}
+                ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('polaroid', '${pol.id}', this, event)">📷 Change</button>` : ''}
             </div>
             <div class="polaroid-caption font-script polaroid-caption-edit" contenteditable="${isEditMode}">${pol.caption}</div>
         `;
@@ -784,22 +798,25 @@ function animateCounters() {
 // -------------------------------------------------------------
 // SECTION 4: INTERACTIVE FUN QUESTIONS
 // -------------------------------------------------------------
-function answerQuestion(num, answer) {
+function answerQuestion(num, answer, event) {
     if (isEditMode) return; // Disable interactive responses in visual editor
 
     const respEl = document.getElementById(`q-resp-${num}`);
     respEl.classList.remove('hidden');
     let text = "";
 
+    const e = event || window.event;
+    const target = e ? e.target : null;
+
     if (num === 1) {
         text = answer ? "Obviously 😌" : "Wrong answer detected 😂";
-        if (!answer) dodgeButton(event.target);
+        if (!answer && target) dodgeButton(target);
     } else if (num === 2) {
         text = answer ? "Mission successful 😎" : "Impossible.";
-        if (!answer) dodgeButton(event.target);
+        if (!answer && target) dodgeButton(target);
     } else if (num === 3) {
         text = answer ? "That means a lot ❤️" : "System error detected 🚨";
-        if (!answer) dodgeButton(event.target);
+        if (!answer && target) dodgeButton(target);
     }
     respEl.innerText = text;
     logAction("Fun Questions", `Answered question ${num}: ${answer ? 'YES' : 'NO'}`);
@@ -885,13 +902,13 @@ function setupMap() {
                 photoFrame.innerHTML = `
                     <div class="img-edit-wrapper">
                         <img src="${pt.photoUrl}" alt="${pt.name}">
-                        ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('map', '${pt.id}', this)">📷 Change</button>` : ''}
+                        ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('map', '${pt.id}', this, event)">📷 Change</button>` : ''}
                     </div>
                 `;
                 photoFrame.classList.remove('hidden');
             } else {
                 if (isEditMode) {
-                    photoFrame.innerHTML = `<button class="btn-admin-action" onclick="triggerPhotoUpload('map', '${pt.id}', this)">📷 Add Location Photo</button>`;
+                    photoFrame.innerHTML = `<button class="btn-admin-action" onclick="triggerPhotoUpload('map', '${pt.id}', this, event)">📷 Add Location Photo</button>`;
                     photoFrame.classList.remove('hidden');
                 } else {
                     photoFrame.classList.add('hidden');
@@ -1704,8 +1721,11 @@ async function saveVisualEdits() {
 // -------------------------------------------------------------
 // IMAGE & AUDIO FILE DIRECT UPLOADS LOGIC
 // -------------------------------------------------------------
-function triggerPhotoUpload(type, id, btnEl) {
-    event.stopPropagation();
+function triggerPhotoUpload(type, id, btnEl, event) {
+    const e = event || window.event;
+    if (e && typeof e.stopPropagation === 'function') {
+        e.stopPropagation();
+    }
     editPhotoContext = { type, id, element: btnEl.closest('.img-edit-wrapper').querySelector('img') };
     document.getElementById('general-image-file').click();
 }
@@ -1739,7 +1759,7 @@ function setupFilePickerListeners() {
                     if (pt) {
                         pt.photoUrl = publicUrl;
                         // update frame
-                        document.getElementById('map-location-photo').innerHTML = `<div class="img-edit-wrapper"><img src="${publicUrl}" alt="${pt.name}"><button class="btn-upload-overlay" onclick="triggerPhotoUpload('map', '${pt.id}', this)">📷 Change</button></div>`;
+                        document.getElementById('map-location-photo').innerHTML = `<div class="img-edit-wrapper"><img src="${publicUrl}" alt="${pt.name}"><button class="btn-upload-overlay" onclick="triggerPhotoUpload('map', '${pt.id}', this, event)">📷 Change</button></div>`;
                     }
                 }
 
@@ -1747,7 +1767,8 @@ function setupFilePickerListeners() {
                 showToast("Photo uploaded successfully! Remember to Save Changes.", "success");
             }
         } catch(err) {
-            showToast("Photo upload failed.", "error");
+            console.error("Photo upload failed:", err);
+            showToast("Photo upload failed: " + (err.message || err), "error");
         }
         
         e.target.value = '';
@@ -1768,7 +1789,8 @@ function setupFilePickerListeners() {
                 showToast("Background song uploaded successfully! Click Save to freeze it.", "success");
             }
         } catch (err) {
-            showToast("Music upload failed.", "error");
+            console.error("Music upload failed:", err);
+            showToast("Music upload failed: " + (err.message || err), "error");
         }
         e.target.value = '';
     });
@@ -1789,7 +1811,8 @@ function setupFilePickerListeners() {
                 showToast("Voice message uploaded successfully! Click Save to freeze it.", "success");
             }
         } catch (err) {
-            showToast("Voice upload failed.", "error");
+            console.error("Voice upload failed:", err);
+            showToast("Voice upload failed: " + (err.message || err), "error");
         }
         e.target.value = '';
     });
