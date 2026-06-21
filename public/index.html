@@ -89,18 +89,38 @@
 
     <!-- 1. PASSWORD LOCK SCREEN -->
     <div id="lock-screen" class="full-screen-overlay active">
-        <div class="glass-card lock-card text-center animate-fade-in">
-            <div class="heart-pulse-icon">❤️</div>
-            <h1 class="font-luxury glow-text" id="edit-brand-title" contenteditable="false">Her Story</h1>
-            <p class="subtitle" id="edit-brand-subtitle" contenteditable="false">A Journey of Memories</p>
-            <p class="lock-hint">Only one special person can enter this journey...</p>
-            
-            <form id="lock-form" class="lock-form">
-                <div class="input-container">
-                    <input type="password" id="site-password" placeholder="Enter Secret Password" required autocomplete="current-password">
-                    <span class="focus-border"></span>
+        <!-- Ambient particles -->
+        <div class="lock-particles" id="lock-particles"></div>
+        <!-- Decorative blurs -->
+        <div class="lock-blur-orb lock-blur-1"></div>
+        <div class="lock-blur-orb lock-blur-2"></div>
+
+        <div class="lock-card-new animate-fade-in">
+            <!-- Top ring + heart -->
+            <div class="lock-heart-ring">
+                <div class="lock-ring-pulse"></div>
+                <div class="lock-heart-emoji">❤️</div>
+            </div>
+
+            <!-- Title -->
+            <h1 class="lock-title font-luxury" id="edit-brand-title" contenteditable="false">Her Story</h1>
+
+            <!-- Greeting (personalized, shown when set) -->
+            <p class="lock-greeting" id="lock-greeting-text"></p>
+
+            <!-- Subtitle (editable, minimal) -->
+            <p class="lock-subtitle" id="edit-brand-subtitle" contenteditable="false">A Journey of Memories</p>
+
+            <!-- Divider -->
+            <div class="lock-divider"><span>♥</span></div>
+
+            <!-- Password form -->
+            <form id="lock-form" class="lock-form-new">
+                <div class="lock-input-wrap">
+                    <span class="lock-key-icon">🔐</span>
+                    <input type="password" id="site-password" placeholder="your secret word..." required autocomplete="current-password">
                 </div>
-                <button type="submit" class="btn-primary">Unlock Journey</button>
+                <button type="submit" class="lock-btn-unlock">Open My Surprise ✨</button>
             </form>
             <p id="lock-error" class="lock-error hidden"></p>
         </div>
@@ -170,22 +190,54 @@
             </div>
         </section>
 
-        <!-- SECTION 2: POLAROID MEMORY WALL -->
-        <section id="sec-polaroids" class="experience-section">
+        <!-- SECTION 2: INSTAGRAM STORY SLIDER -->
+        <section id="sec-polaroids" class="experience-section story-section">
             <div class="section-header text-center">
                 <span class="section-number">02</span>
-                <h2 class="font-luxury section-title">Polaroid Memory Wall</h2>
-                <p class="section-subtitle">Drag them, spin them, scatter them around</p>
+                <h2 class="font-luxury section-title">Our Story</h2>
+                <p class="section-subtitle">Swipe through our memories ❤️</p>
                 <div class="admin-edit-controls hidden">
                     <input type="file" id="bulk-photos-input" accept="image/*" multiple style="display:none;" onchange="handleBulkPhotosUpload()">
-                    <button class="btn-admin-action" onclick="document.getElementById('bulk-photos-input').click()">➕ Bulk Upload Photos</button>
+                    <button class="btn-admin-action" onclick="document.getElementById('bulk-photos-input').click()">➕ Bulk Upload</button>
                 </div>
             </div>
-            <div class="polaroid-canvas" id="polaroid-canvas">
-                <!-- Draggable Polaroids loaded dynamically via JS -->
+
+            <!-- Story Viewer -->
+            <div class="story-viewer" id="story-viewer">
+                <!-- Progress bars -->
+                <div class="story-progress-bar" id="story-progress-bar"></div>
+
+                <!-- Story slide container -->
+                <div class="story-slide-track" id="story-slide-track">
+                    <!-- Slides injected by JS -->
+                </div>
+
+                <!-- Tap zones -->
+                <div class="story-tap-left" onclick="storyNav(-1)"></div>
+                <div class="story-tap-right" onclick="storyNav(1)"></div>
+
+                <!-- Caption overlay -->
+                <div class="story-caption-area" id="story-caption-area">
+                    <div class="story-caption-text font-script" id="story-caption-text"></div>
+                    <div class="story-caption-edit-hint hidden" id="story-caption-edit-hint">✏️ Tap caption to edit</div>
+                </div>
+
+                <!-- Counter -->
+                <div class="story-counter" id="story-counter">1 / 1</div>
+
+                <!-- Admin controls overlay -->
+                <div class="story-admin-overlay hidden" id="story-admin-overlay">
+                    <button class="story-admin-btn" id="story-change-photo-btn" onclick="storyChangePhoto()">📷 Change Photo</button>
+                    <button class="story-admin-btn" style="background: rgba(255, 71, 87, 0.7); border-color: rgba(255, 71, 87, 0.3);" onclick="storyDeleteCurrent()">🗑️ Delete Slide</button>
+                    <input type="file" id="story-photo-input" accept="image/*" style="display:none;" onchange="handleStoryPhotoChange(event)">
+                </div>
+
+                <!-- Pause indicator -->
+                <div class="story-pause-icon hidden" id="story-pause-icon">⏸</div>
             </div>
+
             <div id="bulk-upload-status" class="upload-status hidden text-center" style="margin-top:15px;"></div>
-            <div class="scrapbook-deco">Double-click polaroid to enlarge | Edit captions on cards</div>
+            <div class="scrapbook-deco">Tap left / right to navigate &bull; Hold to pause</div>
         </section>
 
         <!-- SECTION 3: FRIENDSHIP STATS -->
@@ -294,7 +346,10 @@
                 <div class="map-container" id="map-container">
                     <!-- Map SVG Background -->
                     <svg class="map-background" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        <path id="map-path-line" d="M 20,30 Q 30,15 45,25 T 70,50 T 35,75 T 85,80" fill="none" stroke="rgba(255,209,220,0.5)" stroke-width="0.8" stroke-dasharray="2,2"/>
+                        <!-- Neon blur glow -->
+                        <path id="map-path-glow" d="" fill="none" stroke="rgba(255, 105, 180, 0.22)" stroke-width="2.5" />
+                        <!-- Animated dashed route -->
+                        <path id="map-path-line" d="" fill="none" stroke="var(--primary-color)" stroke-width="0.8" stroke-dasharray="3,3" />
                     </svg>
                     <!-- Pulse pins dynamically loaded -->
                 </div>
@@ -328,9 +383,13 @@
                     <h3 class="dream-heading font-luxury" id="edit-dream-body" contenteditable="false">Can we recreate the <span class="highlight-rose">Kadhaippoma</span> travel scene and create one unforgettable memory together?</h3>
                 </div>
                 <div class="dream-road-wrapper">
-                    <div class="dream-road">
-                        <div class="road-strips"></div>
-                        <div class="car-animation">🚗</div>
+                    <div class="dream-road-container" style="position: relative; width: 100%;">
+                        <div class="dream-road">
+                            <div class="road-strips"></div>
+                        </div>
+                        <div class="bike-animation">
+                            <img src="uploads/couple_on_bike.png" alt="Couple riding classic motorcycle together" class="bike-img">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -632,10 +691,10 @@
         <div class="glass-card admin-modal-card">
             <button class="close-modal" onclick="closeAdminModal('share')">×</button>
             <h2 class="font-luxury glow-text text-center">Generate & Share Link</h2>
-            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px; text-align:center;">Copy the private link below and send it to your friend.</p>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px; text-align:center;">Copy the private link and set the password your friend will use to unlock the experience.</p>
             
             <div class="form-row">
-                <label>Private Surpise Link URL</label>
+                <label>Private Surprise Link URL</label>
                 <div style="display:flex; gap:10px; align-items:center;">
                     <input type="text" id="share-link-input" readonly style="flex-grow:1; background:#000;">
                     <button class="btn-admin-bar" onclick="copyShareLink()">Copy</button>
@@ -646,10 +705,38 @@
                 <label for="cfg-private-path">Custom Private URL Path</label>
                 <div style="display:flex; gap:10px; align-items:center;">
                     <span style="color:var(--text-muted); font-size:0.95rem;">website.com/</span>
-                    <input type="text" id="cfg-private-path" placeholder="e.g. aditis-birthday">
-                    <button class="btn-admin-bar" onclick="updatePrivatePath()">Update</button>
+                    <input type="text" id="cfg-private-path" placeholder="e.g. aditis-birthday" style="flex-grow:1;">
                 </div>
                 <small style="color:var(--text-muted);">Changing this changes the private URL path name.</small>
+            </div>
+
+            <div class="form-row" style="margin-top:20px;">
+                <label for="cfg-viewer-password">🔑 Viewer Password (what your friend types to unlock)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="cfg-viewer-password" placeholder="e.g. sweetbun123" style="flex-grow:1;">
+                </div>
+                <small style="color:var(--text-muted);">This is the secret password your friend types on the lock screen.</small>
+            </div>
+
+            <div class="form-row" style="margin-top:20px;">
+                <label for="cfg-lock-greeting">💌 Lock Screen Greeting (e.g. Happy Birthday Sweetbun!)</label>
+                <input type="text" id="cfg-lock-greeting" placeholder="e.g. Happy Birthday Sweetbun! 🎂" style="width:100%;">
+                <small style="color:var(--text-muted);">This appears on the lock screen below the title.</small>
+            </div>
+
+            <div class="form-row" style="margin-top:20px;">
+                <label for="cfg-countdown-datetime">⏰ Countdown Lock — Open Date &amp; Time</label>
+                <input type="datetime-local" id="cfg-countdown-datetime" style="width:100%; padding:10px 15px; background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:#fff; border-radius:8px; outline:none;">
+                <small style="color:var(--text-muted);">Your friend will see a countdown timer until this date/time, then the password screen will appear. Leave empty to skip countdown.</small>
+                <div style="margin-top:8px;">
+                    <button class="btn-admin-bar logout" onclick="clearCountdownInput()">Clear (Skip Countdown)</button>
+                </div>
+                <div id="countdown-status-label" style="margin-top:8px; font-size:0.82rem; color:var(--primary-color);"></div>
+            </div>
+            
+            <div style="margin-top: 30px; border-top: 1px solid var(--glass-border); padding-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn-admin-bar logout" onclick="closeAdminModal('share')">Cancel</button>
+                <button id="btn-share-save" class="btn-admin-submit" style="width: auto; padding: 10px 25px;" onclick="saveAllShareChanges()">Save Changes</button>
             </div>
         </div>
     </div>

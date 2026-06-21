@@ -267,8 +267,23 @@ window.addEventListener('DOMContentLoaded', async () => {
         applySectionOrder();
 
         const gender = config.settings.gender || "her";
-        const brandTitleVal = config.settings.birthdayTitle || (gender === 'him' ? 'His Story' : 'Her Story');
+        let brandTitleVal = config.settings.birthdayTitle || (gender === 'him' ? 'His Story' : 'Her Story');
+        
+        // Sanitize default or old title to remove "my ❤️" or "my" or trailing hearts
+        if (brandTitleVal) {
+            const cleanTitle = brandTitleVal.replace(/\s+my\s*(?:❤️|🤍|💖|💕|✨)?\s*$/gi, '').trim();
+            if (cleanTitle !== brandTitleVal) {
+                brandTitleVal = cleanTitle;
+                config.settings.birthdayTitle = cleanTitle;
+            }
+        }
+        
         document.getElementById('edit-brand-title').innerText = brandTitleVal;
+        // Load subtitle from config if set
+        const subtitleEl = document.getElementById('edit-brand-subtitle');
+        if (subtitleEl && config.settings.brandSubtitle) {
+            subtitleEl.innerText = config.settings.brandSubtitle;
+        }
         
         const genderSelect = document.getElementById('cfg-gender-select');
         if (genderSelect) {
@@ -291,6 +306,24 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('recipient-greeting-name').innerText = config.settings.recipientName.toUpperCase();
         document.getElementById('finale-her-name').innerText = config.settings.recipientName;
+        
+        // Show personalized greeting on lock screen
+        const lockGreetingEl = document.getElementById('lock-greeting-text');
+        let greetingVal = config.settings.lockGreeting;
+        // Sanitize old greeting values containing "Happy Birthday ... ! 🎂" to just use name
+        if (greetingVal && (greetingVal.startsWith("Happy Birthday ") || greetingVal.endsWith("! 🎂"))) {
+            greetingVal = config.settings.recipientName;
+            config.settings.lockGreeting = greetingVal;
+        }
+        
+        if (lockGreetingEl && greetingVal) {
+            lockGreetingEl.innerText = greetingVal;
+            lockGreetingEl.style.display = 'block';
+        } else if (lockGreetingEl) {
+            // Default greeting to just show recipient name (e.g. sweet bun)
+            lockGreetingEl.innerText = config.settings.recipientName || '';
+            lockGreetingEl.style.display = 'block';
+        }
         
         // Load credits fields
         document.getElementById('edit-finale-director').innerText = config.settings.directorName || "Kaja";
@@ -395,7 +428,21 @@ let countdownInterval = null;
 function setupCountdown() {
     if (isEditMode) return; // Skip countdown in visual editor
 
+    // If no countdown date set, show lock screen immediately
+    if (!config.settings.countdownDate) {
+        document.getElementById('countdown-screen').classList.add('hidden');
+        document.getElementById('lock-screen').classList.remove('hidden');
+        return;
+    }
+
     const cdt = new Date(config.settings.countdownDate);
+    // If date is invalid or in the past, skip to lock screen
+    if (isNaN(cdt.getTime()) || cdt <= new Date()) {
+        document.getElementById('countdown-screen').classList.add('hidden');
+        document.getElementById('lock-screen').classList.remove('hidden');
+        return;
+    }
+
     const msgs = [
         "Someone spent a lot of time creating this for you ❤️",
         "Every second brings you closer to your surprise ✨",
@@ -622,120 +669,280 @@ async function logReaction(slideId, type, event) {
 }
 
 // -------------------------------------------------------------
-// SECTION 2: POLAROID MEMORY WALL
+// SECTION 2: INSTAGRAM STYLE STORY SLIDER
 // -------------------------------------------------------------
+let currentStoryIndex = 0;
+let storyTimer = null;
+let storyProgressInterval = null;
+const STORY_DURATION = 5000; // 5 seconds
+let storyStartTime = 0;
+let storyElapsedTime = 0;
+let storyIsPaused = false;
+let storyPauseTime = 0;
+
 function setupPolaroids() {
-    const canvas = document.getElementById('polaroid-canvas');
-    canvas.innerHTML = '';
-
-    config.polaroids.forEach((pol, idx) => {
-        const card = document.createElement('div');
-        card.className = 'polaroid-card';
-        card.id = `pol-${pol.id}`;
-        card.setAttribute('data-id', pol.id);
-        card.innerHTML = `
-            <div class="img-edit-wrapper" style="height:150px;">
-                <div class="polaroid-img-container" style="height:100%;">
-                    <img src="${pol.url}" alt="${pol.caption}" draggable="false" style="width:100%; height:100%; object-fit:cover;">
-                </div>
-                ${isEditMode ? `<button class="btn-upload-overlay" onclick="triggerPhotoUpload('polaroid', '${pol.id}', this, event)">📷 Change</button>` : ''}
-            </div>
-            <div class="polaroid-caption font-script polaroid-caption-edit" contenteditable="${isEditMode}">${pol.caption}</div>
-        `;
-
-        const randX = Math.random() * 55 + 15; // 15% to 70% bounds
-        const randY = Math.random() * 45 + 15; // 15% to 60% bounds
-        const randDeg = Math.random() * 20 - 10;
-
-        card.style.left = `${randX}%`;
-        card.style.top = `${randY}%`;
-        card.style.transform = `rotate(${randDeg}deg)`;
-
-        setupPolaroidDrag(card, canvas);
-
-        card.addEventListener('dblclick', () => {
-            if (card.classList.contains('enlarged')) {
-                card.classList.remove('enlarged');
-                card.style.transform = `rotate(${randDeg}deg)`;
-            } else {
-                document.querySelectorAll('.polaroid-card').forEach(c => c.classList.remove('enlarged'));
-                card.classList.add('enlarged');
-                logAction("Polaroid Wall", `Zoomed polaroid: ${pol.caption}`);
-            }
-        });
-
-        canvas.appendChild(card);
-    });
-}
-
-function setupPolaroidDrag(elmnt, container) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    elmnt.onmousedown = dragMouseDown;
-    elmnt.ontouchstart = dragTouchStart;
-
-    function dragMouseDown(e) {
-        e = e || window.event;
-        e.preventDefault();
-        container.appendChild(elmnt);
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
+    const track = document.getElementById('story-slide-track');
+    const progressBar = document.getElementById('story-progress-bar');
+    const counter = document.getElementById('story-counter');
+    
+    if (!track) return;
+    
+    track.innerHTML = '';
+    progressBar.innerHTML = '';
+    
+    const polaroids = config.polaroids || [];
+    
+    if (polaroids.length === 0) {
+        track.innerHTML = '<div style="color: white; text-align: center; padding-top: 100px;">No stories yet. Click Bulk Upload in Admin mode to add some!</div>';
+        if (counter) counter.innerText = '0 / 0';
+        return;
     }
-
-    function dragTouchStart(e) {
-        container.appendChild(elmnt);
-        const touch = e.touches[0];
-        pos3 = touch.clientX;
-        pos4 = touch.clientY;
-        document.ontouchend = closeDragElement;
-        document.ontouchmove = elementTouchDrag;
-    }
-
-    function elementDrag(e) {
-        e = e || window.event;
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
+    
+    // Create progress segments and slides
+    polaroids.forEach((pol, idx) => {
+        const seg = document.createElement('div');
+        seg.className = 'story-seg';
+        seg.id = `story-seg-${idx}`;
+        seg.innerHTML = '<div class="story-seg-fill"></div>';
+        progressBar.appendChild(seg);
         
-        let newTop = elmnt.offsetTop - pos2;
-        let newLeft = elmnt.offsetLeft - pos1;
-
-        if (newTop >= 0 && newTop <= (container.clientHeight - elmnt.clientHeight)) {
-            elmnt.style.top = newTop + "px";
-        }
-        if (newLeft >= 0 && newLeft <= (container.clientWidth - elmnt.clientWidth)) {
-            elmnt.style.left = newLeft + "px";
-        }
-    }
-
-    function elementTouchDrag(e) {
-        const touch = e.touches[0];
-        pos1 = pos3 - touch.clientX;
-        pos2 = pos4 - touch.clientY;
-        pos3 = touch.clientX;
-        pos4 = touch.clientY;
-
-        let newTop = elmnt.offsetTop - pos2;
-        let newLeft = elmnt.offsetLeft - pos1;
-
-        if (newTop >= 0 && newTop <= (container.clientHeight - elmnt.clientHeight)) {
-            elmnt.style.top = newTop + "px";
-        }
-        if (newLeft >= 0 && newLeft <= (container.clientWidth - elmnt.clientWidth)) {
-            elmnt.style.left = newLeft + "px";
+        const slide = document.createElement('div');
+        slide.className = 'story-slide';
+        slide.setAttribute('data-index', idx);
+        slide.innerHTML = `<img src="${pol.url}" alt="${pol.caption || ''}" draggable="false" loading="lazy">`;
+        track.appendChild(slide);
+    });
+    
+    // Show admin overlay if in edit mode
+    const adminOverlay = document.getElementById('story-admin-overlay');
+    if (adminOverlay) {
+        if (isEditMode) {
+            adminOverlay.classList.remove('hidden');
+            const hint = document.getElementById('story-caption-edit-hint');
+            if (hint) hint.classList.remove('hidden');
+        } else {
+            adminOverlay.classList.add('hidden');
+            const hint = document.getElementById('story-caption-edit-hint');
+            if (hint) hint.classList.add('hidden');
         }
     }
-
-    function closeDragElement() {
-        document.onmouseup = null;
-        document.onmousemove = null;
-        document.ontouchend = null;
-        document.ontouchmove = null;
-        logAction("Polaroid Wall", "Dragged polaroid card");
+    
+    // Make caption editable if in edit mode
+    const captionText = document.getElementById('story-caption-text');
+    if (captionText) {
+        captionText.contentEditable = isEditMode;
+        if (isEditMode) {
+            // Listen for input / blur to save changes
+            captionText.onblur = () => {
+                const pol = config.polaroids[currentStoryIndex];
+                if (pol) {
+                    pol.caption = captionText.innerText.trim();
+                }
+            };
+        }
+    }
+    
+    // Set initial slide
+    showStory(currentStoryIndex);
+    
+    // Setup hold to pause
+    const viewer = document.getElementById('story-viewer');
+    if (viewer) {
+        viewer.onmousedown = startStoryPause;
+        viewer.onmouseup = endStoryPause;
+        viewer.onmouseleave = endStoryPause;
+        viewer.ontouchstart = (e) => {
+            if (e.target.closest('.story-admin-btn')) return;
+            startStoryPause();
+        };
+        viewer.ontouchend = (e) => {
+            if (e.target.closest('.story-admin-btn')) return;
+            endStoryPause();
+        };
     }
 }
+
+function showStory(idx) {
+    const polaroids = config.polaroids || [];
+    if (polaroids.length === 0) return;
+    
+    // Boundary check
+    if (idx < 0) idx = polaroids.length - 1;
+    if (idx >= polaroids.length) idx = 0;
+    
+    currentStoryIndex = idx;
+    
+    // Update active slide class
+    const slides = document.querySelectorAll('.story-slide');
+    slides.forEach((slide, i) => {
+        if (i === idx) {
+            slide.classList.add('active');
+        } else {
+            slide.classList.remove('active');
+        }
+    });
+    
+    // Update progress bar segments
+    const segments = document.querySelectorAll('.story-seg');
+    segments.forEach((seg, i) => {
+        const fill = seg.querySelector('.story-seg-fill');
+        if (i < idx) {
+            seg.className = 'story-seg done';
+            if (fill) fill.style.width = '100%';
+        } else if (i === idx) {
+            seg.className = 'story-seg active';
+            if (fill) fill.style.width = '0%';
+        } else {
+            seg.className = 'story-seg';
+            if (fill) fill.style.width = '0%';
+        }
+    });
+    
+    // Update caption
+    const captionText = document.getElementById('story-caption-text');
+    if (captionText) {
+        captionText.innerText = polaroids[idx].caption || '';
+    }
+    
+    // Update counter
+    const counter = document.getElementById('story-counter');
+    if (counter) {
+        counter.innerText = `${idx + 1} / ${polaroids.length}`;
+    }
+    
+    // Restart animation timer
+    startStoryTimer();
+}
+
+function startStoryTimer() {
+    clearInterval(storyProgressInterval);
+    clearTimeout(storyTimer);
+    
+    if (isEditMode) return; // Don't auto-advance in edit mode
+    
+    storyStartTime = Date.now();
+    storyElapsedTime = 0;
+    storyIsPaused = false;
+    
+    const duration = STORY_DURATION;
+    
+    storyProgressInterval = setInterval(() => {
+        if (storyIsPaused) return;
+        
+        storyElapsedTime = Date.now() - storyStartTime;
+        if (storyElapsedTime >= duration) {
+            storyElapsedTime = duration;
+            clearInterval(storyProgressInterval);
+            storyNav(1); // Advance next
+        }
+        
+        const activeSeg = document.querySelector('.story-seg.active .story-seg-fill');
+        if (activeSeg) {
+            const pct = (storyElapsedTime / duration) * 100;
+            activeSeg.style.width = `${pct}%`;
+        }
+    }, 30);
+}
+
+function startStoryPause() {
+    if (isEditMode) return;
+    storyIsPaused = true;
+    storyPauseTime = Date.now();
+    
+    const pauseIcon = document.getElementById('story-pause-icon');
+    if (pauseIcon) pauseIcon.classList.remove('hidden');
+}
+
+function endStoryPause() {
+    if (isEditMode || !storyIsPaused) return;
+    storyIsPaused = false;
+    
+    // Adjust start time to account for the paused duration
+    const pausedDuration = Date.now() - storyPauseTime;
+    storyStartTime += pausedDuration;
+    
+    const pauseIcon = document.getElementById('story-pause-icon');
+    if (pauseIcon) pauseIcon.classList.add('hidden');
+}
+
+function storyNav(dir) {
+    const polaroids = config.polaroids || [];
+    if (polaroids.length === 0) return;
+    
+    let nextIdx = currentStoryIndex + dir;
+    if (nextIdx < 0) nextIdx = polaroids.length - 1;
+    if (nextIdx >= polaroids.length) nextIdx = 0;
+    
+    showStory(nextIdx);
+}
+
+function storyChangePhoto() {
+    const currentPol = config.polaroids[currentStoryIndex];
+    if (!currentPol) return;
+    
+    const activeSlide = document.querySelector(`.story-slide[data-index="${currentStoryIndex}"]`);
+    if (!activeSlide) return;
+    
+    const img = activeSlide.querySelector('img');
+    editPhotoContext = { type: 'polaroid', id: currentPol.id, element: img };
+    
+    document.getElementById('general-image-file').click();
+}
+
+function storyDeleteCurrent() {
+    if (config.polaroids.length <= 1) {
+        showToast("You must have at least one story slide!", "error");
+        return;
+    }
+    if (confirm("Are you sure you want to delete this story slide?")) {
+        config.polaroids.splice(currentStoryIndex, 1);
+        currentStoryIndex = Math.max(0, currentStoryIndex - 1);
+        setupPolaroids();
+        showToast("Story deleted! Remember to Save Changes.", "success");
+    }
+}
+
+async function handleBulkPhotosUpload() {
+    const input = document.getElementById('bulk-photos-input');
+    if (!input.files || input.files.length === 0) return;
+    
+    const files = Array.from(input.files);
+    const statusDiv = document.getElementById('bulk-upload-status');
+    if (statusDiv) {
+        statusDiv.innerText = `Uploading 0/${files.length} photos...`;
+        statusDiv.classList.remove('hidden');
+    }
+    
+    let successCount = 0;
+    for (let i = 0; i < files.length; i++) {
+        try {
+            if (statusDiv) statusDiv.innerText = `Uploading ${i + 1}/${files.length} photos...`;
+            const publicUrl = await uploadToSupabaseStorage(files[i]);
+            if (publicUrl) {
+                const newPol = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    url: publicUrl,
+                    caption: "Click to edit caption ✨"
+                };
+                config.polaroids.push(newPol);
+                successCount++;
+            }
+        } catch (err) {
+            console.error("Bulk upload err: ", err);
+        }
+    }
+    
+    if (statusDiv) {
+        statusDiv.innerText = `Successfully uploaded ${successCount} photos!`;
+        setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+    }
+    
+    if (successCount > 0) {
+        setupPolaroids();
+        showToast(`Successfully added ${successCount} new stories! Remember to Save Changes.`, "success");
+    }
+}
+
 
 // -------------------------------------------------------------
 // SECTION 3: FRIENDSHIP STATS
@@ -872,15 +1079,33 @@ function setupEnvelopes() {
 // -------------------------------------------------------------
 function setupMap() {
     const map = document.getElementById('map-container');
+    if (!map) return;
     map.querySelectorAll('.map-pin').forEach(pin => pin.remove());
 
-    config.mapPoints.forEach((pt, idx) => {
+    const mapPoints = config.mapPoints || [];
+    
+    // Build dynamic path line connecting pins in chronological/index order
+    const pathLine = document.getElementById('map-path-line');
+    const pathGlow = document.getElementById('map-path-glow');
+    if (mapPoints.length > 0) {
+        let pathD = `M ${mapPoints[0].coordinateX},${mapPoints[0].coordinateY}`;
+        for (let i = 1; i < mapPoints.length; i++) {
+            pathD += ` L ${mapPoints[i].coordinateX},${mapPoints[i].coordinateY}`;
+        }
+        if (pathLine) pathLine.setAttribute('d', pathD);
+        if (pathGlow) pathGlow.setAttribute('d', pathD);
+    }
+
+    mapPoints.forEach((pt, idx) => {
         const pin = document.createElement('div');
         pin.className = 'map-pin';
         pin.setAttribute('data-index', idx);
         pin.style.left = `${pt.coordinateX}%`;
         pin.style.top = `${pt.coordinateY}%`;
-        pin.innerHTML = `<span class="pin-label">${pt.name}</span>`;
+        pin.innerHTML = `
+            <span class="pin-number">${idx + 1}</span>
+            <span class="pin-label">${pt.name}</span>
+        `;
 
         pin.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -930,6 +1155,9 @@ function setupMap() {
     // Relocate Map Pins in Edit Mode by clicking map
     map.addEventListener('click', (e) => {
         if (!isEditMode) return;
+        // If clicking a pin, don't relocate
+        if (e.target.closest('.map-pin')) return;
+        
         const rect = map.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
@@ -1565,6 +1793,15 @@ function unlockEditorMode() {
     document.getElementById('btn-visual-share').addEventListener('click', openShareLinkModal);
     document.getElementById('btn-visual-stats').addEventListener('click', openStatsSubmissionsModal);
     document.getElementById('btn-visual-logout').addEventListener('click', handleAdminLogout);
+
+    const privatePathInput = document.getElementById('cfg-private-path');
+    if (privatePathInput) {
+        privatePathInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim().replace(/\s+/g, '-').toLowerCase();
+            const fullUrl = `${window.location.protocol}//${window.location.host}/${val}`;
+            document.getElementById('share-link-input').value = fullUrl;
+        });
+    }
 }
 
 function handleAdminLogout() {
@@ -1585,7 +1822,7 @@ function setupWYSIWYGListeners() {
         if (target.id === 'edit-brand-title') {
             config.settings.birthdayTitle = text;
         } else if (target.id === 'edit-brand-subtitle') {
-            config.settings.recipientName = text;
+            config.settings.brandSubtitle = text;
         } else if (target.id === 'edit-dream-body') {
             // keep the highlight-rose intact internally if needed, or update text
         } else if (target.id === 'edit-gift-wish') {
@@ -1604,11 +1841,14 @@ function setupWYSIWYGListeners() {
             config.timeline[idx].caption = text;
         }
         
-        // Polaroid Captions
+        // Gallery / Polaroid Captions (new gallery-card layout)
         else if (target.classList.contains('polaroid-caption-edit')) {
-            const pid = target.closest('.polaroid-card').getAttribute('data-id');
-            const pol = config.polaroids.find(p => p.id === pid);
-            if (pol) pol.caption = text;
+            const cardEl = target.closest('.gallery-card') || target.closest('.polaroid-card');
+            if (cardEl) {
+                const pid = cardEl.getAttribute('data-id');
+                const pol = config.polaroids.find(p => p.id === pid);
+                if (pol) pol.caption = text;
+            }
         }
 
         // Envelope Titles & Contents
@@ -1695,6 +1935,31 @@ async function uploadToSupabaseStorage(file) {
 }
 
 // Floating Save trigger
+async function syncLocalConfig() {
+    try {
+        const authRes = await fetch('/api/admin/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: adminToken })
+        });
+        if (authRes.ok) {
+            const authData = await authRes.json();
+            const token = authData.token;
+            
+            await fetch('/api/admin/config', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token
+                },
+                body: JSON.stringify(config)
+            });
+        }
+    } catch (e) {
+        console.log("Local Express config sync skipped or failed (likely running serverless/Vercel)");
+    }
+}
+
 async function saveVisualEdits() {
     try {
         // Compile any active inline text blur
@@ -1709,6 +1974,9 @@ async function saveVisualEdits() {
         });
 
         if (error) throw error;
+
+        // Sync to local server if running
+        await syncLocalConfig();
 
         if (soundSynth) soundSynth.playTwinkle();
         showToast("Visual settings saved successfully! Your surprise has been frozen ❤️", "success");
@@ -1947,7 +2215,163 @@ function openShareLinkModal() {
     document.getElementById('share-link-input').value = fullUrl;
     document.getElementById('cfg-private-path').value = path;
     
+    // Populate viewer password field
+    const pwdInput = document.getElementById('cfg-viewer-password');
+    if (pwdInput) pwdInput.value = config.settings.password || '';
+    
+    // Populate lock greeting field
+    const greetingInput = document.getElementById('cfg-lock-greeting');
+    if (greetingInput) {
+        let currentGreeting = config.settings.lockGreeting;
+        if (currentGreeting && (currentGreeting.startsWith("Happy Birthday ") || currentGreeting.endsWith("! 🎂"))) {
+            currentGreeting = config.settings.recipientName;
+        }
+        greetingInput.value = currentGreeting || config.settings.recipientName || '';
+    }
+    
+    // Populate countdown datetime field
+    const cdtInput = document.getElementById('cfg-countdown-datetime');
+    const statusLabel = document.getElementById('countdown-status-label');
+    if (cdtInput) {
+        if (config.settings.countdownDate) {
+            // Convert stored ISO to local datetime-local format
+            const d = new Date(config.settings.countdownDate);
+            const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            cdtInput.value = localISO;
+            const now = new Date();
+            if (d > now) {
+                if (statusLabel) statusLabel.innerText = `⏳ Countdown active — unlocks on ${d.toLocaleString()}`;
+            } else {
+                if (statusLabel) statusLabel.innerText = `✅ Countdown already passed — friend sees password screen directly.`;
+            }
+        } else {
+            cdtInput.value = '';
+            if (statusLabel) statusLabel.innerText = `⚡ No countdown set — friend sees password screen immediately.`;
+        }
+    }
+    
     document.getElementById('admin-share-overlay').classList.remove('hidden');
+}
+
+function updateCountdownDate() {
+    const cdtInput = document.getElementById('cfg-countdown-datetime');
+    const statusLabel = document.getElementById('countdown-status-label');
+    if (!cdtInput || !cdtInput.value) {
+        showToast('Please pick a date and time first.', 'error');
+        return;
+    }
+    const selectedDate = new Date(cdtInput.value);
+    config.settings.countdownDate = selectedDate.toISOString();
+    const now = new Date();
+    const diff = selectedDate - now;
+    if (diff > 0) {
+        const d = Math.floor(diff / (1000*60*60*24));
+        const h = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+        const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+        if (statusLabel) statusLabel.innerText = `⏳ Countdown set! Unlocks in ${d}d ${h}h ${m}m. Click 💾 Save to apply.`;
+        showToast(`⏰ Countdown set to ${selectedDate.toLocaleString()} — Click Save Changes!`, 'success');
+    } else {
+        if (statusLabel) statusLabel.innerText = `⚠️ That date is in the past — friend will see password screen immediately.`;
+        showToast('That date/time is already in the past.', 'error');
+    }
+}
+
+function clearCountdownDate() {
+    config.settings.countdownDate = null;
+    const cdtInput = document.getElementById('cfg-countdown-datetime');
+    const statusLabel = document.getElementById('countdown-status-label');
+    if (cdtInput) cdtInput.value = '';
+    if (statusLabel) statusLabel.innerText = '⚡ Countdown cleared — friend sees password screen immediately. Click 💾 Save.';
+    showToast('Countdown cleared. Click Save Changes to apply.', 'success');
+}
+
+function clearCountdownInput() {
+    const cdtInput = document.getElementById('cfg-countdown-datetime');
+    const statusLabel = document.getElementById('countdown-status-label');
+    if (cdtInput) cdtInput.value = '';
+    if (statusLabel) statusLabel.innerText = '⚡ Countdown cleared — friend sees password screen immediately.';
+    showToast('Countdown cleared locally. Remember to click Save Changes to apply.', 'info');
+}
+
+async function saveAllShareChanges() {
+    const pathInput = document.getElementById('cfg-private-path').value.trim().replace(/\s+/g, '-').toLowerCase();
+    if (!pathInput) {
+        showToast("Please enter a custom private URL path.", "error");
+        return;
+    }
+
+    const pwdInput = document.getElementById('cfg-viewer-password').value.trim();
+    if (!pwdInput) {
+        showToast("Please enter a viewer password.", "error");
+        return;
+    }
+
+    const greetingInput = document.getElementById('cfg-lock-greeting').value.trim();
+    const cdtInput = document.getElementById('cfg-countdown-datetime').value;
+
+    config.settings.privatePath = pathInput;
+    config.settings.password = pwdInput;
+    config.settings.lockGreeting = greetingInput;
+
+    if (cdtInput) {
+        config.settings.countdownDate = new Date(cdtInput).toISOString();
+    } else {
+        config.settings.countdownDate = null;
+    }
+
+    // Update read-only field in the modal
+    const fullUrl = `${window.location.protocol}//${window.location.host}/${pathInput}`;
+    document.getElementById('share-link-input').value = fullUrl;
+
+    const lockGreetingEl = document.getElementById('lock-greeting-text');
+    if (lockGreetingEl && greetingInput) {
+        lockGreetingEl.innerText = greetingInput;
+        lockGreetingEl.style.display = 'block';
+    }
+
+    const saveBtn = document.getElementById('btn-share-save');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerText = "Saving...";
+    }
+
+    try {
+        const { error } = await supabaseClient.rpc('save_config', {
+            pass: adminToken,
+            new_config: config
+        });
+
+        if (error) throw error;
+
+        // Sync to local server if running
+        await syncLocalConfig();
+
+        if (soundSynth) soundSynth.playTwinkle();
+        showToast("All settings saved and link generated successfully! ❤️", "success");
+
+        const statusLabel = document.getElementById('countdown-status-label');
+        if (statusLabel) {
+            if (config.settings.countdownDate) {
+                const d = new Date(config.settings.countdownDate);
+                const now = new Date();
+                if (d > now) {
+                    statusLabel.innerText = `⏳ Countdown active — unlocks on ${d.toLocaleString()}`;
+                } else {
+                    statusLabel.innerText = `✅ Countdown already passed — friend sees password screen directly.`;
+                }
+            } else {
+                statusLabel.innerText = `⚡ No countdown set — friend sees password screen immediately.`;
+            }
+        }
+    } catch(err) {
+        console.error(err);
+        showToast("Failed to save changes.", "error");
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = "Save Changes";
+        }
+    }
 }
 
 function closeAdminModal(type) {
@@ -1972,6 +2396,36 @@ async function updatePrivatePath() {
     document.getElementById('share-link-input').value = fullUrl;
     
     showToast("URL path updated! Remember to Save Changes to make it active.", "success");
+}
+
+function updateViewerPassword() {
+    const pwdInput = document.getElementById('cfg-viewer-password');
+    if (!pwdInput) return;
+    const newPwd = pwdInput.value.trim();
+    if (!newPwd) {
+        showToast("Please enter a password first.", "error");
+        return;
+    }
+    config.settings.password = newPwd;
+    showToast(`🔑 Viewer password set to: "${newPwd}" — Click Save Changes to apply!`, "success");
+}
+
+function updateLockGreeting() {
+    const greetingInput = document.getElementById('cfg-lock-greeting');
+    if (!greetingInput) return;
+    const newGreeting = greetingInput.value.trim();
+    if (!newGreeting) {
+        showToast("Please enter a greeting text first.", "error");
+        return;
+    }
+    config.settings.lockGreeting = newGreeting;
+    // Live-update the lock screen greeting
+    const lockGreetingEl = document.getElementById('lock-greeting-text');
+    if (lockGreetingEl) {
+        lockGreetingEl.innerText = newGreeting;
+        lockGreetingEl.style.display = 'block';
+    }
+    showToast(`💌 Lock greeting updated! Click Save Changes to apply.`, "success");
 }
 
 async function openStatsSubmissionsModal() {
