@@ -638,21 +638,28 @@ function setupTimeline() {
     const btnPrev = document.getElementById('timeline-prev');
     const btnNext = document.getElementById('timeline-next');
 
-    btnPrev.addEventListener('click', () => {
+    // Sync currentSlide variable when user swipes/scrolls manually
+    wrapper.onscroll = () => {
+        if (wrapper.clientWidth > 0) {
+            currentSlide = Math.round(wrapper.scrollLeft / wrapper.clientWidth);
+        }
+    };
+
+    btnPrev.onclick = () => {
         if (currentSlide > 0) {
             currentSlide--;
             wrapper.scrollTo({ left: wrapper.clientWidth * currentSlide, behavior: 'smooth' });
             logAction("Timeline Slide", `Navigated to slide ${currentSlide}`);
         }
-    });
+    };
 
-    btnNext.addEventListener('click', () => {
+    btnNext.onclick = () => {
         if (currentSlide < config.timeline.length - 1) {
             currentSlide++;
             wrapper.scrollTo({ left: wrapper.clientWidth * currentSlide, behavior: 'smooth' });
             logAction("Timeline Slide", `Navigated to slide ${currentSlide}`);
         }
-    });
+    };
 }
 
 async function logReaction(slideId, type, event) {
