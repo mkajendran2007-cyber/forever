@@ -4,6 +4,14 @@
 const SUPABASE_URL = 'https://kvtdwoosektgnoueqohu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_4_eA4UwrykRBYbMrT5wvKw_C-IHdRjI';
 
+// Debug Logger for client-side errors
+window.addEventListener('error', function(e) {
+    alert("JS Error: " + e.message + "\nLine: " + e.lineno + "\nFile: " + e.filename);
+});
+window.addEventListener('unhandledrejection', function(e) {
+    alert("Promise Rejection: " + e.reason + "\nStack: " + (e.reason && e.reason.stack ? e.reason.stack : 'No stack trace'));
+});
+
 // Initialize Supabase Client
 const supabaseClient = (typeof window !== 'undefined' && window.supabase) 
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) 
@@ -1737,10 +1745,12 @@ async function handleAdminLogin(e) {
         } else {
             errorEl.innerText = "Incorrect admin password.";
             errorEl.classList.remove('hidden');
+            alert("Incorrect admin password. Please try again.");
         }
     } catch(err) {
         errorEl.innerText = "Connection failed or unauthorized.";
         errorEl.classList.remove('hidden');
+        alert("Login Error: " + (err.message || err) + "\nDetails: " + JSON.stringify(err));
     }
 }
 
