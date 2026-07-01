@@ -1747,6 +1747,10 @@ async function handleAdminLogin(e) {
 function unlockEditorMode() {
     isEditMode = true;
     
+    // Hide trigger button
+    const triggerBtn = document.getElementById('btn-admin-trigger');
+    if (triggerBtn) triggerBtn.classList.add('hidden');
+    
     // Show editor bar
     document.getElementById('admin-editor-bar').classList.remove('hidden');
     document.body.classList.add('admin-logged-in');
@@ -2372,6 +2376,15 @@ async function saveAllShareChanges() {
             saveBtn.innerText = "Save Changes";
         }
     }
+}
+
+function openAdminLoginModal() {
+    document.getElementById('admin-login-overlay').classList.remove('hidden');
+    document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
+}
+
+function closeAdminLoginModal() {
+    document.getElementById('admin-login-overlay').classList.add('hidden');
 }
 
 function closeAdminModal(type) {

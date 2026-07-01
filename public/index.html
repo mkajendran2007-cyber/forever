@@ -41,6 +41,9 @@
 </head>
 <body>
 
+    <!-- Subtle Admin Access Button (Shown on Lock/Countdown screen if not logged in) -->
+    <button id="btn-admin-trigger" class="admin-trigger-btn" onclick="openAdminLoginModal()">⚙️ Admin</button>
+
     <!-- Stars Particles Canvas (Behind Everything) -->
     <canvas id="canvas-particles"></canvas>
 
@@ -674,6 +677,7 @@
     <!-- ADMIN ACCESS GATE LOGIN MODAL (Admin only) -->
     <div id="admin-login-overlay" class="admin-login-overlay hidden">
         <div class="glass-card admin-login-card text-center">
+            <button class="close-modal" onclick="closeAdminLoginModal()">×</button>
             <h2 class="font-luxury glow-text" style="margin-bottom:10px;">Visual Editor Login</h2>
             <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">Enter your admin password to visually customize the experience</p>
             <form id="admin-login-form">
